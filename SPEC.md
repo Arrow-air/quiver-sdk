@@ -85,15 +85,19 @@ All devices share a flat `192.168.144.0/24` network, dictated by Siyi's hardcode
 
 ### Attachment port mapping
 
-Each physical port has its own Ethernet switch port. IP assignment is static, developer-managed in the `.100–.199` range. Recommended defaults to minimize collisions:
+Each physical port uses the Quiver Attachment Interface PCB (v1.2, 15.8 × 23.5 mm). Every port provides Ethernet, CAN, always-on 12V, and a switched 12V line (`12VSW`) — active only on the bottom port via relay 1 on the Main PCB. IP assignment is static, developer-managed in the `.100–.199` range.
 
-| Port | Connector | Signal pin | Recommended IP |
-|---|---|---|---|
-| Bottom | J31 | FMU_CH1 | 192.168.144.100 |
-| Side 1 | J29 | FMU_CH7 | 192.168.144.101 |
-| Side 2 | J30 | FMU_CH8 | 192.168.144.102 |
+| Port | Main PCB conn. | FMU signal | 12VSW | Ethernet switch port | Recommended IP |
+|---|---|---|---|---|---|
+| Bottom | J31 | FMU_CH1 | ✅ relay 1 | ETH1_2 (J39) | 192.168.144.100 |
+| Side 1 | J29 | FMU_CH7 | ❌ | ETH1_3 (J37) | 192.168.144.101 |
+| Side 2 | J30 | FMU_CH8 | ❌ | ETH2_1 (J38) | 192.168.144.102 |
 
-> ⚠️ **Note:** Earlier QuiverHub docs assigned C1=.11, C2=.12, C3=.13. Those addresses conflict with Siyi hardware. The correct range for attachment devices is `.100–.199`.
+Attachment PCB hardware: [`Arrow-air/project-quiver — 0003-Attachment-Interface-PCB`](https://github.com/Arrow-air/project-quiver/tree/main/task-grant-bounty/pt3/electronics/0003-Attachment-Interface-PCB)
+
+> ⚠️ **IP conflict fix:** Earlier QuiverHub docs assigned C1=.11, C2=.12, C3=.13. Those addresses conflict with Siyi hardware. Correct range is `.100–.199`.
+
+> **No analog I/O.** Earlier payload template docs referenced an "Analog I/O (0–5V)" pin. This pin does not exist on the Attachment Interface PCB and has been removed from this spec.
 
 ---
 

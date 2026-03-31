@@ -31,32 +31,83 @@ A payload that does not implement this contract still works — but only as a ra
 
 ## 2. Hardware Interface
 
-All Quiver attachment ports use a **10-pin Molex Mini-Fit Jr. connector** (PN: 2077601281 / mating: 2045231201, IP65 when mated, rated 100 mating cycles).
+### Attachment Interface PCB
 
-### Connector pinout
+Each Quiver attachment port uses a custom 2-layer PCB (v1.2, July 2025) designed for quick-release payload integration.
 
-| Pin | Function | Description |
+**PCB specs:**
+- Dimensions: 15.8 mm × 23.5 mm
+- Thickness: 1.2 mm (non-standard — thinner than FR4 default)
+- Mounting: 4× M2 holes
+- KiCad files: [`Arrow-air/project-quiver`](https://github.com/Arrow-air/project-quiver/tree/main/task-grant-bounty/pt3/electronics/0003-Attachment-Interface-PCB)
+
+The PCB carries three connectors. The same board layout is used on both the drone side and the payload side — populated differently depending on role:
+
+| Ref | Part | Type | Role |
+|---|---|---|---|
+| J1 | Molex 2077601281 | 12-pin locking | Cable harness to Main PCB |
+| J2 | Mill-Max 813-22-010-30-000101 | 10-pin spring-loaded pogo | Board-to-board mating (drone side) |
+| J3 | Mill-Max 419-10-210-30-054000 | 10-pin surface-mount target | Board-to-board mating (payload side) |
+
+J2 and J3 are a mating pair — the drone's J2 (pogo) contacts the payload's J3 (target) when the quick-release plate clicks in.
+
+---
+
+### J1 — Main harness connector (12-pin Molex 2077601281)
+
+This is the locking cable connector. On the drone side it connects via harness to the Main PCB. On the payload side it connects to the payload's internal electronics. Pins 2+4 (12VSW) and pins 6+8 (GND) are doubled for current capacity.
+
+| Pin | Net | Description |
 |---|---|---|
-| 1 | Ethernet TX+ | Transmit positive |
-| 2 | Ethernet TX- | Transmit negative |
-| 3 | Ethernet RX+ | Receive positive |
-| 4 | Ethernet RX- | Receive negative |
-| 5 | CAN H | CAN bus high (3.3V) |
-| 6 | CAN L | CAN bus low (3.3V) |
-| 7 | Analog I/O | 0–5V analog input/output |
-| 8 | Digital I/O | FMU_CH signal (3.3V logic) |
-| 9 | 12V Power | 12V DC, 2.0A max |
-| 10 | Ground | System ground |
+| 1 | ETH_RX+ | Ethernet receive+ (drone perspective) |
+| 2 | 12VSW | Switched 12V |
+| 3 | ETH_RX- | Ethernet receive− |
+| 4 | 12VSW | Switched 12V (doubled for current) |
+| 5 | ETH_TX+ | Ethernet transmit+ (drone perspective) |
+| 6 | GND | Ground |
+| 7 | ETH_TX- | Ethernet transmit− |
+| 8 | GND | Ground (doubled for current) |
+| 9 | CAN1_N | CAN bus negative (CAN_L) |
+| 10 | +12V | Always-on 12V |
+| 11 | CAN1_P | CAN bus positive (CAN_H) |
+| 12 | FMU_CHx | FMU signal (channel varies by port — see table below) |
+
+Mating connector (payload cable side): Molex 204523-1201
+
+---
+
+### J2 / J3 — Board-to-board interface (10-pin)
+
+J2 and J3 carry the same signals as J1, condensed to 10 pins (single 12VSW and single GND):
+
+| Pin | Net | Description |
+|---|---|---|
+| 1 | ETH_RX+ | Ethernet receive+ (drone perspective) |
+| 2 | 12VSW | Switched 12V |
+| 3 | ETH_RX- | Ethernet receive− |
+| 4 | GND | Ground |
+| 5 | ETH_TX+ | Ethernet transmit+ |
+| 6 | +12V | Always-on 12V |
+| 7 | ETH_TX- | Ethernet transmit− |
+| 8 | FMU_CHx | FMU signal (channel varies by port) |
+| 9 | CAN1_P | CAN bus positive (CAN_H) |
+| 10 | CAN1_N | CAN bus negative (CAN_L) |
+
+> **ETH TX/RX naming** is from the drone's perspective. From the payload's perspective, the directions are reversed (payload transmits on drone's RX pair, receives on drone's TX pair).
+
+---
 
 ### Port-specific capabilities
 
-| Port | Connector | FMU signal | Switched 12V | Ethernet switch port |
+| Port | Main PCB conn. | FMU signal | Switched 12V (12VSW) | Ethernet switch port |
 |---|---|---|---|---|
-| Bottom | J31 | FMU_CH1 | ✅ (via relay 1) | ETH1_2 (J39) |
-| Side 1 | J29 | FMU_CH7 | ❌ | ETH1_3 (J37) |
-| Side 2 | J30 | FMU_CH8 | ❌ | ETH2_1 (J38) |
+| Bottom | J31 | FMU_CH1 | ✅ (relay 1 on Main PCB) | ETH1_2 (J39) |
+| Side 1 | J29 | FMU_CH7 | ❌ (line present, unpowered) | ETH1_3 (J37) |
+| Side 2 | J30 | FMU_CH8 | ❌ (line present, unpowered) | ETH2_1 (J38) |
 
-> **Switched 12V is bottom-only.** Heavy actuators (pumps, motors, dispensers) must use the bottom port.
+> **12VSW is bottom-only.** The 12VSW net is physically present on all three ports via the attachment PCB, but the Main PCB only activates it for the bottom port (via SSR relay 1). Heavy actuators (pumps, motors, dispensers) must use the bottom port.
+
+> **No analog I/O.** There is no analog signal pin on the Quiver attachment interface. Earlier documentation referencing an "Analog I/O (0–5V)" pin was incorrect.
 
 ### Network
 
@@ -644,13 +695,33 @@ CAN_BAUDRATE         = 1_000_000
 MAX_CURRENT_DRAW_A   = 2.0
 VOLTAGE_NOMINAL_V    = 12.0
 
-# Connector pins (BCM for RPi, mapped for ESP32/STM32)
-PIN_CAN_H            = 23
-PIN_CAN_L            = 24
-PIN_ANALOG_IO        = 25
-PIN_DIGITAL_IO       = 16   # FMU_CH signal (BCM)
-PIN_POWER_12V        = 12
-PIN_GROUND           = 6
+# J1 (Molex 2077601281) connector pin numbers — for reference
+# Drone-side PCB: J1 → harness → Main PCB
+# Payload-side PCB: J1 → payload electronics
+J1_ETH_RX_P          = 1
+J1_12VSW_A           = 2    # Switched 12V (pin A of doubled pair)
+J1_ETH_RX_N          = 3
+J1_12VSW_B           = 4    # Switched 12V (pin B of doubled pair)
+J1_ETH_TX_P          = 5
+J1_GND_A             = 6    # Ground (pin A of doubled pair)
+J1_ETH_TX_N          = 7
+J1_GND_B             = 8    # Ground (pin B of doubled pair)
+J1_CAN_N             = 9    # CAN bus negative (CAN_L)
+J1_12V               = 10   # Always-on 12V
+J1_CAN_P             = 11   # CAN bus positive (CAN_H)
+J1_FMU_CH            = 12   # FMU signal (CH1 bottom / CH7 side1 / CH8 side2)
+
+# J2/J3 (10-pin board-to-board) connector pin numbers
+J2_ETH_RX_P          = 1
+J2_12VSW             = 2
+J2_ETH_RX_N          = 3
+J2_GND               = 4
+J2_ETH_TX_P          = 5
+J2_12V               = 6
+J2_ETH_TX_N          = 7
+J2_FMU_CH            = 8
+J2_CAN_P             = 9
+J2_CAN_N             = 10
 ```
 
 ---
