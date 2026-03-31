@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/Arrow-air/quiver-sdk/schemas/device_status/v1.json",
+  "title": "quiver/device_status/v1",
+  "type": "object",
+  "required": ["timestamp", "health"],
+  "properties": {
+    "timestamp": {"type": "number"},
+    "health":    {"type": "string", "enum": ["ok", "warning", "error", "unknown"]},
+    "uptime_s":  {"type": "number", "minimum": 0},
+    "error":     {"type": ["string", "null"]},
+    "info":      {"type": "object"}
+  }
+}

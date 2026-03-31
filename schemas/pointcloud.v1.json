@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/Arrow-air/quiver-sdk/schemas/pointcloud/v1.json",
+  "title": "quiver/pointcloud/v1",
+  "type": "object",
+  "required": ["timestamp", "scan_id", "points"],
+  "properties": {
+    "timestamp": {"type": "number", "description": "Unix epoch seconds"},
+    "scan_id":   {"type": "integer", "description": "Monotonically increasing scan counter"},
+    "frame":     {"type": "string", "enum": ["sensor", "body", "world"], "default": "sensor"},
+    "points": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["angle_deg", "distance_m"],
+        "properties": {
+          "angle_deg":   {"type": "number"},
+          "distance_m":  {"type": "number", "minimum": 0},
+          "quality":     {"type": "integer", "minimum": 0, "maximum": 255},
+          "x":           {"type": "number"},
+          "y":           {"type": "number"},
+          "z":           {"type": "number"}
+        }
+      }
+    }
+  }
+}

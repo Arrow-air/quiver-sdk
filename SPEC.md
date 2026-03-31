@@ -1,9 +1,10 @@
 # SPEC.md — Arrow/Quiver SDK
 
 **Status:** Draft  
-**Date:** 2026-03-30  
+**Date:** 2026-03-31  
 **Authors:** 21stCenturyAlex, Vector  
-**Input documents:** Thomas's SDK planning gist (2026-03-22), QuiverHub Architecture Reference (2026-02-21), QuiverHub Developer Guide (2026-02-12), RPLidar MVP note (2025-12-03), SDK Information Note (2026-01-25)
+**Input documents:** Thomas's SDK planning gist (2026-03-22), QuiverHub Architecture Reference (2026-02-21), QuiverHub Developer Guide (2026-02-12), RPLidar MVP note (2025-12-03), SDK Information Note (2026-01-25)  
+**Companion document:** [`PAYLOAD_SPEC.md`](PAYLOAD_SPEC.md) — payload data contract
 
 ---
 
@@ -369,43 +370,115 @@ cam.on("tf_card_error", callback)
 
 Device-oriented, not port-oriented. SDK cannot auto-detect physical port from CAN ID or IP (shared bus, unmanaged switch). Developer knows what they plugged in and where.
 
-### Ethernet device
+The full payload data contract — manifest format, canonical stream types, command interface, CAN types, mDNS — is defined in [`PAYLOAD_SPEC.md`](PAYLOAD_SPEC.md). This section describes the SDK API surface that consumes that contract.
+
+### Ethernet device — manifest-aware (preferred)
+
+Payloads that implement the Quiver payload contract (serve `/quiver/manifest`) get the full typed API:
 
 ```python
 from quiver import Attachment
 
+# Connect — SDK fetches manifest automatically
+lidar = Attachment("192.168.144.100")
+await lidar.ready()  # waits for manifest fetch + connection
+
+# Typed stream — type is known from manifest (quiver/pointcloud/v1)
+@lidar.on_stream("scan")
+def on_scan(msg):  # msg is a typed PointCloud object
+    print(f"{len(msg.points)} points @ {msg.timestamp:.3f}")
+
+# Command
+await lidar.command("start")
+await lidar.command("stop")
+
+# Inspect manifest
+lidar.name            # "RPLidar C1"
+lidar.streams         # [{"id": "scan", "type": "quiver/pointcloud/v1", ...}]
+lidar.commands        # [{"id": "start", ...}, {"id": "stop", ...}]
+
+# Get stream as async generator
+async for msg in lidar.stream("scan"):
+    process(msg.points)
+```
+
+### Ethernet device — raw mode (fallback)
+
+Payloads without a manifest still work via the raw interface:
+
+```python
 # Raw bytes
 device = Attachment("192.168.144.100")
-device.send(b"start")
-device.on_receive(callback)
+device.raw.send(b"start")
+device.raw.on_receive(callback)
 device.connected
 
-# JSON protocol
-sprayer = Attachment("192.168.144.100", protocol="json")
-sprayer.send({"command": "start", "rate": 2.5})
-sprayer.on("status", callback)
+# Raw JSON (no schema validation)
+device = Attachment("192.168.144.100", protocol="json")
+device.raw.send({"command": "start", "rate": 2.5})
+device.raw.on("data", callback)
 ```
 
 ### CAN device
 
+CAN payloads use DroneCAN/UAVCAN. Message types are DSDL-defined (see `PAYLOAD_SPEC.md` Section 5). SDK presents typed Python objects:
+
 ```python
 sensor = Attachment(can_node=42)
-sensor.send_can(msg_id, data)
-sensor.on_can(msg_id, callback)
+
+# Typed — SDK wraps DroneCAN DSDL message
+sensor.on_can("uavcan.equipment.range_sensor.Measurement", callback)
+# callback receives typed RangeMeasurement, not raw CAN frame
+
+# Raw CAN — escape hatch
+sensor.raw_can.send(msg_id, data)
+sensor.raw_can.on(msg_id, callback)
 ```
 
 ### Discovery
 
 ```python
-devices = Attachment.scan()                  # ping sweep .100–.199 + CAN node scan
-sprayer = Attachment.find("sprayer.local")   # mDNS
+# Ping sweep .100–.199 + CAN node scan + mDNS
+devices = Attachment.scan()
+# → [QuiverDevice(ip=".100", name="RPLidar C1", type="quiver/pointcloud/v1"),
+#    QuiverDevice(can_node=42, dsdl="uavcan.equipment.range_sensor.Measurement")]
+
+# mDNS name resolution (_quiver._tcp)
+lidar = Attachment.find("rplidar-c1.local")
+
+# Connect knowing only IP — manifest fetch happens on ready()
+sprayer = Attachment("192.168.144.101")
 ```
 
-**Payload developer contract:**
+### Typed message classes
+
+Each canonical stream type from `PAYLOAD_SPEC.md` has a corresponding Python class in `quiver._types`:
+
+```python
+from quiver.types import PointCloud, RangeMeasurement, Environmental, ActuatorStatus
+
+# Manually construct (for testing / simulation)
+msg = PointCloud(
+    timestamp=time.time(),
+    scan_id=1,
+    points=[{"angle_deg": 0.0, "distance_m": 2.5, "quality": 47}]
+)
+
+# Access fields
+msg.points[0].distance_m   # 2.5
+msg.points[0].angle_deg    # 0.0
+```
+
+### Payload developer contract (summary)
+
+Full contract in `PAYLOAD_SPEC.md`. Short version:
+
 - Assign a static IP in `192.168.144.100–.199`
-- Or claim a unique CAN node ID on CAN2
-- Optionally implement mDNS for name-based discovery
-- Document your device's IP/node and protocol
+- Serve `GET /quiver/manifest` returning the manifest JSON
+- Serve streams per manifest (`websocket` or `http`)
+- Format messages as the declared `quiver/*` type
+- Optionally advertise via mDNS (`_quiver._tcp`)
+- Or: use a unique CAN node ID on CAN2 and broadcast DroneCAN DSDL types
 
 ---
 
@@ -484,16 +557,29 @@ quiver-hub/
 
 The following require explicit agreement before implementation begins:
 
+### SDK core
+
 | # | Decision | Options | Status |
 |---|---|---|---|
 | 1 | **MAVLink connection string default** | `udp:127.0.0.1:14550` vs `udpin://0.0.0.0:14540` | ❓ |
 | 2 | **pymavlink async model** | Background thread + queue vs `asyncio.run_in_executor` | ❓ |
 | 3 | **`quiver-hub` repo home** | `Arrow-air/quiver-hub` vs `Pan-Robotics/quiver-hub` | ❓ |
-| 4 | **Attachment port recommended IPs** | Fixed .100/.101/.102 defaults vs fully open .100–.199 | ❓ |
-| 5 | **Hub API versioning** | Path-based (`/v1/`) vs header-based | ❓ |
-| 6 | **Offline telemetry buffering** | Drop frames vs persist to disk vs in-memory queue with cap | ❓ |
-| 7 | **Camera module scope** | Siyi A8 only (now) vs multi-camera abstraction (future) | ❓ |
-| 8 | **ROS2 compatibility layer** | Out of scope v1 vs optional `quiver.ros` submodule | ❓ |
+| 4 | **Offline telemetry buffering** | Drop frames vs persist to disk vs in-memory queue with cap | ❓ |
+| 5 | **Camera module scope** | Siyi A8 only (now) vs multi-camera abstraction (future) | ❓ |
+| 6 | **Hub API versioning** | Path-based (`/v1/`) vs header-based | ❓ |
+| 7 | **ROS2 compatibility layer** | Out of scope v1 vs optional `quiver.ros` submodule | ❓ |
+
+### Payload contract (see also `PAYLOAD_SPEC.md` Section 9)
+
+| # | Decision | Options | Status |
+|---|---|---|---|
+| 8 | **Manifest required or optional** | Required for typed API (raw always available) vs fully optional | ❓ |
+| 9 | **WebSocket vs HTTP threshold** | ≥5 Hz = WebSocket. Right cutoff? | ❓ |
+| 10 | **Manifest cache TTL** | Forever until reconnect vs explicit TTL | ❓ |
+| 11 | **mDNS — required or optional** | "should" vs "must" for certified payloads | ❓ |
+| 12 | **Schema validation** | Strict on by default vs opt-in | ❓ |
+| 13 | **`quiver/custom/v1` schema_url** | Required (Hub needs it for widgets) vs optional | ❓ |
+| 14 | **CAN payload manifest** | Rely on DroneCAN node info vs optional manifest over MAVLink STATUSTEXT | ❓ |
 
 ---
 
@@ -514,8 +600,10 @@ The following require explicit agreement before implementation begins:
 |---|---|
 | M1 | `quiver.vehicle` working on real hardware — connect, telemetry, arm/disarm, preflight |
 | M2 | `quiver.camera` working on A8 Mini — gimbal, photo, stream URL |
-| M3 | `quiver.attachment` — ETH device, CAN device, scan |
-| M4 | `quiver-hub` telemetry forwarder replacing existing MAVSDK-based forwarder |
-| M5 | `quiver-hub` job runner parity with existing `raspberry_pi_client.py` |
-| M6 | Payload streamer (LiDAR reference pipeline ported) |
-| M7 | PyPI publish, systemd templates, developer docs |
+| M3 | `quiver.attachment` raw mode — ETH device, CAN device, `scan()` |
+| M4 | Payload contract v1 — manifest server + canonical types in `quiver-payload-template` |
+| M5 | `quiver.attachment` typed mode — manifest fetch, typed streams, commands, mDNS |
+| M6 | `quiver-hub` telemetry forwarder replacing existing MAVSDK-based forwarder |
+| M7 | `quiver-hub` job runner parity with existing `raspberry_pi_client.py` |
+| M8 | Payload streamer (LiDAR reference pipeline ported, Hub App Builder integration) |
+| M9 | PyPI publish, systemd templates, developer docs |

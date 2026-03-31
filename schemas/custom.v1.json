@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/Arrow-air/quiver-sdk/schemas/custom/v1.json",
+  "title": "quiver/custom/v1",
+  "type": "object",
+  "required": ["timestamp", "schema_url", "data"],
+  "properties": {
+    "timestamp":  {"type": "number"},
+    "schema_url": {"type": "string", "format": "uri"},
+    "data":       {"type": "object"}
+  }
+}

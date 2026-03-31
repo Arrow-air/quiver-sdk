@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/Arrow-air/quiver-sdk/schemas/environmental/v1.json",
+  "title": "quiver/environmental/v1",
+  "type": "object",
+  "required": ["timestamp"],
+  "anyOf": [
+    {"required": ["temperature_c"]},
+    {"required": ["humidity_pct"]},
+    {"required": ["pressure_pa"]},
+    {"required": ["co2_ppm"]},
+    {"required": ["pm2_5_ug_m3"]}
+  ],
+  "properties": {
+    "timestamp":      {"type": "number"},
+    "temperature_c":  {"type": "number"},
+    "humidity_pct":   {"type": "number", "minimum": 0, "maximum": 100},
+    "pressure_pa":    {"type": "number", "minimum": 0},
+    "co2_ppm":        {"type": "number", "minimum": 0},
+    "pm2_5_ug_m3":    {"type": "number", "minimum": 0}
+  }
+}

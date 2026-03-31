@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/Arrow-air/quiver-sdk/schemas/range/v1.json",
+  "title": "quiver/range/v1",
+  "type": "object",
+  "required": ["timestamp", "sensor_id", "distance_m"],
+  "properties": {
+    "timestamp":        {"type": "number"},
+    "sensor_id":        {"type": "integer"},
+    "distance_m":       {"type": "number", "minimum": 0},
+    "min_range_m":      {"type": "number", "minimum": 0},
+    "max_range_m":      {"type": "number", "minimum": 0},
+    "field_of_view_deg":{"type": "number", "minimum": 0, "maximum": 360},
+    "sensor_type":      {"type": "string", "enum": ["laser", "ultrasonic", "radar", "infrared"]}
+  }
+}
