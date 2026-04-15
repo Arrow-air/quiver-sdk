@@ -27,7 +27,7 @@ drone.land()
 **Two packages:**
 
 - **`quiver-sdk`** — Core hardware abstraction. Protocol-direct Python library. Offline-capable. Runs on the onboard Raspberry Pi or any machine on the Quiver network.
-- **`quiver-hub`** — Platform integration layer. Connects `quiver-sdk` to [QuiverHub](https://github.com/Pan-Robotics/Quiver-Hub) for telemetry forwarding, remote job execution, and payload streaming.
+- **`quiver-hub`** — Platform integration layer. Connects `quiver-sdk` to [QuiverHub](https://github.com/Pan-Robotics/Arrow-Quiver-Hub) for telemetry forwarding, remote job execution, and payload streaming.
 
 ---
 

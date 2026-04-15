@@ -775,4 +775,4 @@ Adding a new canonical type requires:
 | This document (PAYLOAD_SPEC.md) | `Arrow-air/quiver-sdk` | Data contract for payloads talking to the SDK |
 | [SPEC.md](SPEC.md) | `Arrow-air/quiver-sdk` | SDK architecture and API surface |
 | [Quiver Payload Integration Guide](https://github.com/Pan-Robotics/quiver-payload-template/tree/dev) | `Pan-Robotics/quiver-payload-template` | Hardware integration guide; should reference this doc for software contract |
-| [QuiverHub Architecture](https://github.com/Pan-Robotics/Quiver-Hub) | `Pan-Robotics/Quiver-Hub` | Hub-side rendering and app model |
+| [QuiverHub Architecture](https://github.com/Pan-Robotics/Arrow-Quiver-Hub) | `Pan-Robotics/Arrow-Quiver-Hub` | Hub-side rendering and app model |
